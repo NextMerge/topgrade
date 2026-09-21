@@ -1043,9 +1043,7 @@ pub fn run_pi(ctx: &ExecutionContext) -> Result<()> {
 
     // `pi update --self` errors when PI_SKIP_VERSION_CHECK is set. Homebrew sets it when it runs.
     let pi_skip_version_check_env = std::env::var("PI_SKIP_VERSION_CHECK").is_ok();
-    let pi_installed_through_homebrew = pi
-        .canonicalize()
-        .is_ok_and(|p| p.to_string_lossy().contains("/Cellar/"));
+    let pi_installed_through_homebrew = is_installed_via_homebrew(&pi);
 
     if supports_explicit_update_targets {
         if pi_skip_version_check_env {
@@ -1060,6 +1058,12 @@ pub fn run_pi(ctx: &ExecutionContext) -> Result<()> {
     } else {
         ctx.execute(&pi).arg("update").status_checked()
     }
+}
+
+fn is_installed_via_homebrew(binary: &Path) -> bool {
+    binary
+        .canonicalize()
+        .is_ok_and(|p| p.to_string_lossy().contains("/Cellar/"))
 }
 
 pub fn run_pipx_update(ctx: &ExecutionContext) -> Result<()> {
@@ -2844,7 +2848,10 @@ pub fn run_mise(ctx: &ExecutionContext) -> Result<()> {
         .stdout
         .contains("self-update");
 
-    if supports_self_update {
+    let installed_via_homebrew = is_installed_via_homebrew(&mise);
+    if installed_via_homebrew {
+        debug!("Skipping `mise self-update`: mise is installed via Homebrew");
+    } else if supports_self_update {
         ctx.execute(&mise)
             .args(["self-update"])
             .arg_if(ctx.config().yes(Step::Mise), "--yes")
